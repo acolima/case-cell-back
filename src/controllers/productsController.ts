@@ -8,7 +8,8 @@ async function get(req: Request, res: Response) {
 }
 
 async function create(req: Request, res: Response) {
-  const { name, model, price, brand, rating, reviews, tag, color } = req.body;
+  const { name, model, price, brand, rating, reviews, tag, color, quantity } =
+    req.body;
 
   const newProduct = await productsService.create({
     name,
@@ -19,6 +20,7 @@ async function create(req: Request, res: Response) {
     color,
     tag,
     reviews,
+    quantity,
   });
 
   res.status(201).json(newProduct);
