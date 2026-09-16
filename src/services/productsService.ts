@@ -29,10 +29,24 @@ function getById(id: number): Product | undefined {
   return products.find((p) => p.id === id);
 }
 
+function decreaseStock(id: number, quantity: number): void {
+  const product = products.find((p) => p.id === id);
+  if (!product) {
+    throw new Error(`Produto com ID ${id} não encontrado.`);
+  }
+
+  if (product.quantity < quantity) {
+    throw new Error(`Estoque insuficiente para o produto "${product.name}".`);
+  }
+
+  product.quantity -= quantity;
+}
+
 export const productsService = {
   get,
   getById,
   create,
+  decreaseStock,
 };
 
 const products: Product[] = [

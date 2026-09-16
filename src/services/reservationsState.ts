@@ -211,6 +211,15 @@ export function deleteReservationItem(
   return undefined;
 }
 
+export function clearClientCart(clientId: string): boolean {
+  const cart = clientCarts.get(clientId);
+  if (!cart) return false;
+
+  clearTimeout(cart.timer);
+  clientCarts.delete(clientId);
+  return true;
+}
+
 export function getClientReservations(clientId: string): Reservation[] {
   const cart = clientCarts.get(clientId);
   if (!cart) return [];
