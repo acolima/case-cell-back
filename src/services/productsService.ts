@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Product } from "../domain/product.js";
 import { getReservedQuantity } from "./reservationsState.js";
+import { conflictError, notFoundError } from "../utils/errorUtils.js";
 
 async function get() {
   return products.map((product) => {
@@ -32,11 +33,13 @@ function getById(id: number): Product | undefined {
 function decreaseStock(id: number, quantity: number): void {
   const product = products.find((p) => p.id === id);
   if (!product) {
-    throw new Error(`Produto com ID ${id} não encontrado.`);
+    throw notFoundError(`Produto com ID ${id} não encontrado.`);
   }
 
   if (product.quantity < quantity) {
-    throw new Error(`Estoque insuficiente para o produto "${product.name}".`);
+    throw conflictError(
+      `Estoque insuficiente para o produto "${product.name}". Estoque atual: ${product.quantity}, solicitado: ${quantity}.`,
+    );
   }
 
   product.quantity -= quantity;

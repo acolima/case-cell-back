@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { Order, OrderItem } from "../domain/order.js";
 import { productsService } from "./productsService.js";
 import { clearClientCart, getClientReservations } from "./reservationsState.js";
+import { notFoundError } from "../utils/errorUtils.js";
 
 const orders: Order[] = [];
 
@@ -9,7 +10,7 @@ async function checkout(clientId: string): Promise<Order> {
   const reservedItems = getClientReservations(clientId);
 
   if (!reservedItems || reservedItems.length === 0) {
-    throw new Error("Carrinho vazio ou a reserva já expirou.");
+    throw notFoundError("Carrinho vazio ou a reserva já expirou.");
   }
 
   const orderItems: OrderItem[] = [];
@@ -19,7 +20,7 @@ async function checkout(clientId: string): Promise<Order> {
     const product = productsService.getById(item.productId);
 
     if (!product) {
-      throw new Error(`Produto com ID ${item.productId} não encontrado.`);
+      throw notFoundError(`Produto com ID ${item.productId} não encontrado.`);
     }
 
     const subtotal = product.price * item.quantity;

@@ -7,6 +7,7 @@ import {
   deleteReservationItem,
   getClientReservations,
 } from "./reservationsState.js";
+import { conflictError, notFoundError } from "../utils/errorUtils.js";
 
 const RESERVATION_TTL_MS = 10 * 60 * 1000;
 
@@ -19,7 +20,7 @@ async function reserve(
   const product = productsService.getById(productId);
 
   if (!product) {
-    throw new Error(`Produto ${productId} não encontrado.`);
+    throw notFoundError(`Produto com ID ${productId} não encontrado.`);
   }
 
   const existingItem = getItemInClientCart(clientId, productId);
@@ -42,12 +43,16 @@ async function reserve(
     const availableInStock = product.quantity - totalReserved;
 
     if (delta > availableInStock) {
-      throw new Error(`Estoque insuficiente.`);
+      throw conflictError(
+        `Estoque insuficiente para o produto "${product.name}". Disponível no momento: ${availableInStock}, solicitado adicional: ${delta}.`,
+      );
     }
   }
 
   if (delta < 0 && currentQuantityInCart === 0) {
-    throw new Error("O produto não está no carrinho para ser diminuído.");
+    throw conflictError(
+      `O produto "${product.name}" não está no carrinho para ter a quantidade reduzida.`,
+    );
   }
 
   return updateItemQuantity(
@@ -63,7 +68,9 @@ async function cancel(reservationId: string): Promise<Reservation> {
   const reservation = deleteReservationItem(reservationId);
 
   if (!reservation) {
-    throw new Error(`Reserva ${reservationId} não encontrada ou já expirou.`);
+    throw notFoundError(
+      `Reserva "${reservationId}" não encontrada ou já expirou.`,
+    );
   }
 
   return reservation;

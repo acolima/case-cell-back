@@ -1,17 +1,16 @@
 import { Request, Response } from "express";
 import { ordersService } from "../services/ordersService.js";
+import { validationError } from "../utils/errorUtils.js";
 
 async function checkout(req: Request, res: Response) {
   const { clientId } = req.body;
 
-  if (!clientId) {
-    return res
-      .status(400)
-      .json({ message: "O clientId é obrigatório para finalizar o pedido." });
+  if (!clientId || typeof clientId !== "string" || clientId.trim() === "") {
+    throw validationError("O campo 'clientId' deve ser uma string não vazia.");
   }
 
   try {
-    const order = await ordersService.checkout(clientId);
+    const order = await ordersService.checkout(clientId.trim());
     return res.status(201).json(order);
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
@@ -23,7 +22,15 @@ async function getOrders(req: Request, res: Response) {
 
   try {
     if (clientId) {
-      const orders = await ordersService.getOrdersByClientId(clientId as string);
+      if (typeof clientId !== "string" || clientId.trim() === "") {
+        throw validationError(
+          "O campo 'clientId' deve ser uma string não vazia.",
+        );
+      }
+
+      const orders = await ordersService.getOrdersByClientId(
+        clientId as string,
+      );
       return res.json(orders);
     }
 
