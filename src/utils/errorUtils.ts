@@ -1,4 +1,8 @@
-type AppErrorTypes = "conflict" | "not_found" | "validation_error";
+type AppErrorTypes =
+  | "conflict"
+  | "not_found"
+  | "validation_error"
+  | "service_unavailable";
 
 export interface AppError {
   type: AppErrorTypes;
@@ -13,6 +17,7 @@ export function errorTypeToStatusCode(type: AppErrorTypes) {
   if (type === "not_found") return 404;
   if (type === "conflict") return 409;
   if (type === "validation_error") return 422;
+  if (type === "service_unavailable") return 503;
   return 400;
 }
 
@@ -26,4 +31,8 @@ export function notFoundError(message?: string): AppError {
 
 export function validationError(message?: string): AppError {
   return { type: "validation_error", message: message ?? "" };
+}
+
+export function serviceUnavailableError(message?: string): AppError {
+  return { type: "service_unavailable", message: message ?? "" };
 }

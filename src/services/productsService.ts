@@ -26,6 +26,19 @@ async function create(data: Omit<Product, "id" | "createdAt">) {
   return newProduct;
 }
 
+async function getProductById(id: number): Promise<Product> {
+  const product = products.find((p) => p.id === id);
+  if (!product) {
+    throw notFoundError(`Produto com ID ${id} não encontrado.`);
+  }
+
+  const reserved = getReservedQuantity(product.id);
+  return {
+    ...product,
+    quantity: Math.max(0, product.quantity - reserved),
+  };
+}
+
 function getById(id: number): Product | undefined {
   return products.find((p) => p.id === id);
 }
@@ -38,7 +51,7 @@ function decreaseStock(id: number, quantity: number): void {
 
   if (product.quantity < quantity) {
     throw conflictError(
-      `Estoque insuficiente para o produto "${product.name}". Estoque atual: ${product.quantity}, solicitado: ${quantity}.`,
+      `Estoque insuficiente para o produto "${product.name}"`,
     );
   }
 
@@ -47,6 +60,7 @@ function decreaseStock(id: number, quantity: number): void {
 
 export const productsService = {
   get,
+  getProductById,
   getById,
   create,
   decreaseStock,

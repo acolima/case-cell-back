@@ -12,5 +12,7 @@ export interface Order {
   items: OrderItem[];
   total: number;
   status: "COMPLETED" | "CANCELED";
+  idempotencyKey?: string;
+  erpProtocol?: string;
   createdAt: Date;
 }

@@ -2,57 +2,111 @@ import { randomUUID } from "crypto";
 import { Order, OrderItem } from "../domain/order.js";
 import { productsService } from "./productsService.js";
 import { clearClientCart, getClientReservations } from "./reservationsState.js";
-import { notFoundError } from "../utils/errorUtils.js";
+import { erpService } from "./erpService.js";
+import { notFoundError, conflictError } from "../utils/errorUtils.js";
 
 const orders: Order[] = [];
 
-async function checkout(clientId: string): Promise<Order> {
-  const reservedItems = getClientReservations(clientId);
+const idempotencyStore = new Map<string, Order>();
+const inFlightRequests = new Set<string>();
 
-  if (!reservedItems || reservedItems.length === 0) {
-    throw notFoundError("Carrinho vazio ou a reserva já expirou.");
-  }
+export interface CheckoutOptions {
+  idempotencyKey?: string;
+  simulateErpError?: boolean;
+  simulateErpDelayMs?: number;
+}
 
-  const orderItems: OrderItem[] = [];
-  let total = 0;
+async function checkout(
+  clientId: string,
+  options: CheckoutOptions = {},
+): Promise<Order> {
+  const { idempotencyKey, simulateErpError, simulateErpDelayMs } = options;
 
-  for (const item of reservedItems) {
-    const product = productsService.getById(item.productId);
-
-    if (!product) {
-      throw notFoundError(`Produto com ID ${item.productId} não encontrado.`);
+  if (idempotencyKey) {
+    if (inFlightRequests.has(idempotencyKey)) {
+      throw conflictError(
+        "Um pedido com esta mesma chave de idempotência já está sendo processado. Aguarde.",
+      );
     }
 
-    const subtotal = product.price * item.quantity;
-    total += subtotal;
+    const existingOrder = idempotencyStore.get(idempotencyKey);
+    if (existingOrder) {
+      console.log(
+        `[Idempotency] Pedido já processado anteriormente para a chave: ${idempotencyKey}`,
+      );
+      return existingOrder;
+    }
 
-    orderItems.push({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      quantity: item.quantity,
-      subtotal: Number(subtotal.toFixed(2)),
-    });
+    inFlightRequests.add(idempotencyKey);
   }
 
-  for (const item of reservedItems) {
-    productsService.decreaseStock(item.productId, item.quantity);
+  try {
+    const reservedItems = getClientReservations(clientId);
+
+    if (!reservedItems || reservedItems.length === 0) {
+      throw notFoundError(
+        "Não foi possível finalizar o pedido: o carrinho está vazio ou a reserva já expirou.",
+      );
+    }
+
+    const orderItems: OrderItem[] = [];
+    let total = 0;
+
+    for (const item of reservedItems) {
+      const product = productsService.getById(item.productId);
+
+      if (!product) {
+        throw notFoundError(`Produto com ID ${item.productId} não encontrado.`);
+      }
+
+      const subtotal = product.price * item.quantity;
+      total += subtotal;
+
+      orderItems.push({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: item.quantity,
+        subtotal: Number(subtotal.toFixed(2)),
+      });
+    }
+
+    total = Number(total.toFixed(2));
+
+    const erpResult = await erpService.processOrderInErp(
+      { clientId, total, itemCount: orderItems.length },
+      { forceError: simulateErpError, delayMs: simulateErpDelayMs },
+    );
+
+    for (const item of reservedItems) {
+      productsService.decreaseStock(item.productId, item.quantity);
+    }
+
+    clearClientCart(clientId);
+
+    const newOrder: Order = {
+      id: randomUUID(),
+      clientId,
+      items: orderItems,
+      total,
+      status: "COMPLETED",
+      idempotencyKey,
+      erpProtocol: erpResult.protocol,
+      createdAt: new Date(),
+    };
+
+    orders.push(newOrder);
+
+    if (idempotencyKey) {
+      idempotencyStore.set(idempotencyKey, newOrder);
+    }
+
+    return newOrder;
+  } finally {
+    if (idempotencyKey) {
+      inFlightRequests.delete(idempotencyKey);
+    }
   }
-
-  clearClientCart(clientId);
-
-  const newOrder: Order = {
-    id: randomUUID(),
-    clientId,
-    items: orderItems,
-    total: Number(total.toFixed(2)),
-    status: "COMPLETED",
-    createdAt: new Date(),
-  };
-
-  orders.push(newOrder);
-
-  return newOrder;
 }
 
 async function getOrders(): Promise<Order[]> {

@@ -44,7 +44,7 @@ async function reserve(
 
     if (delta > availableInStock) {
       throw conflictError(
-        `Estoque insuficiente para o produto "${product.name}". Disponível no momento: ${availableInStock}, solicitado adicional: ${delta}.`,
+        `Estoque insuficiente para o produto "${product.name}".`,
       );
     }
   }
